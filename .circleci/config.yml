@@ -8,12 +8,12 @@ executors:
 
 jobs:
   checkout_code:
-    executor: docker-executor
+    executor: docker-executor # This executor belongs to checkout_code
     steps:
       - checkout
 
   build_docker_image:
-    executor: docker-executor
+    executor: docker-executor # This executor belongs to build_docker_image
     steps:
       - checkout
       - setup_remote_docker
@@ -30,16 +30,16 @@ jobs:
             docker push us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/mlops-app/mlops-app:latest
 
   deploy_to_gke:
-    executor: docker-executor
+    executor: docker-executor # This executor belongs to deploy_to_gke
     steps:
       - checkout
-      - setup_remote_docker
+      - setup_remote_docker # Note: setup_remote_docker is usually not needed for kubectl commands unless you are building/pushing *within* this job. You might be able to remove this.
       - run:
           name: Authenticate with Google Cloud
           command: |
             echo "$GCLOUD_SERVICE_KEY" | base64 --decode > gcp-key.json
             gcloud auth activate-service-account --key-file=gcp-key.json
-            gcloud auth configure-docker us-central1-docker.pkg.dev || gcloud auth configure-docker
+            # gcloud auth configure-docker is not needed for GKE deployment
       - run:
           name: Configure GKE
           command: |
