@@ -8,12 +8,12 @@ executors:
 
 jobs:
   checkout_code:
-    executor: docker-executor # This executor belongs to checkout_code
+    executor: docker-executor
     steps:
       - checkout
 
   build_docker_image:
-    executor: docker-executor # This executor belongs to build_docker_image
+    executor: docker-executor
     steps:
       - checkout
       - setup_remote_docker
@@ -22,24 +22,28 @@ jobs:
           command: |
             echo "$GCLOUD_SERVICE_KEY" | base64 --decode > gcp-key.json
             gcloud auth activate-service-account --key-file=gcp-key.json
-            gcloud auth configure-docker us-central1-docker.pkg.dev || gcloud auth configure-docker
+            gcloud auth configure-docker us-central1-docker.pkg.dev # This is sufficient for Artifact Registry
+
       - run:
           name: Build and Push Docker Image
           command: |
-            docker build -t us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/mlops-app/mlops-app:latest .
-            docker push us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/mlops-app/mlops-app:latest
+            # Corrected image name format: hostname/project-id/repository/image:tag
+            IMAGE_FULL_NAME="us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/my-repo/mlops-app:latest"
+            docker build -t ${IMAGE_FULL_NAME} .
+            docker push ${IMAGE_FULL_NAME}
 
   deploy_to_gke:
-    executor: docker-executor # This executor belongs to deploy_to_gke
+    executor: docker-executor
     steps:
       - checkout
-      - setup_remote_docker # Note: setup_remote_docker is usually not needed for kubectl commands unless you are building/pushing *within* this job. You might be able to remove this.
+      - setup_remote_docker # Check if this is actually needed for deployment steps
       - run:
           name: Authenticate with Google Cloud
           command: |
             echo "$GCLOUD_SERVICE_KEY" | base64 --decode > gcp-key.json
             gcloud auth activate-service-account --key-file=gcp-key.json
             # gcloud auth configure-docker is not needed for GKE deployment
+
       - run:
           name: Configure GKE
           command: |
@@ -47,6 +51,9 @@ jobs:
       - run:
           name: Deploy to GKE
           command: |
+            # You will also need to update your kubernetes-deployment.yaml
+            # to reference the image from 'my-repo', e.g.,
+            # image: us-central1-docker.pkg.dev/$GOOGLE_PROJECT_ID/my-repo/mlops-app:latest
             kubectl apply -f kubernetes-deployment.yaml
 
 workflows:
